@@ -2,6 +2,21 @@
 #include <ESP8266WebServer.h>
 #include <PubSubClient.h>
 #include <FS.h>
+#include <EEPROM.h>
+
+/*
+Wireless AP
+Wireless STA
+MQTT
+Arquivo de configuração:
+https://arduino.stackexchange.com/questions/25945/how-to-read-and-write-eeprom-in-esp8266
+https://github.com/esp8266/Arduino/tree/master/libraries/EEPROM/examples
+http://pedrominatel.com.br/pt/esp8266/utilizando-eeprom-do-esp8266/
+Botão de restet
+Requests
+Web Server
+mDNS => https://tttapa.github.io/ESP8266/Chap08%20-%20mDNS.html
+*/
 
 const char* WIFI_SSID = "uaifai";
 const char* WIFI_PASSWORD = "123rep456";
@@ -15,12 +30,13 @@ const char* mqttid = "67482172314";
 const int AP_CLIENTE = D5;
 const int BOT = D0;
 
-int JUMPER_RESET = 0;
 int lastButtonState = 0;
 int buttonState = 0;
 
 int statusCode;
 String content;
+String Teste;
+struct data;
 
 void initPins();
 void initSerial();
@@ -29,6 +45,12 @@ void initMQTT();
 void initSPIFFS();
 void initResetJumper();
 void initServer();
+
+struct {
+    bool firstconfig = true;
+    char ssid[20] = "";
+    char pass[32] = "";
+} data;
 
 WiFiClient CLIENT;
 
@@ -40,21 +62,35 @@ ESP8266WebServer server(80);
 void setup(void) {
   initPins();
   initSerial();
-  initWiFi();
-  initMQTT();
-  initSPIFFS();
-  initResetJumper();
-  initServer();
+  EEPROM.begin(300);
+  if (EEPROM.read(0) == 255) {
+    initStruct();
+    Serial.println(EEPROM.read(0));
+  }
+
+  if (data.firstconfig == true) {
+    initWiFi();
+  } else {
+    initMQTT();
+    initServer();
+  }
 }
 
 void loop() {
-  if (!MQTT.connected()) {
-    reconnectMQTT();
-  }
-  reconnectWiFi();
+  //if (!MQTT.connected()) {
+    //reconnectMQTT();
+  //}
+  //reconnectWiFi();
   BotState();
   MQTT.loop();
   server.handleClient();
+}
+
+void initStruct() {
+  
+  uint addr = 1;
+
+  
 }
 
 void initServer() {
@@ -70,7 +106,7 @@ void initServer() {
   server.on("/js/settings.js", loadSettingsJS);
 
   // JSON
-  server.on("/settingsSave.json", saveSettings);
+  server.on("/config", saveSettings);
 
   // CSS
   server.on ("/style.css", loadStyle);
@@ -111,16 +147,9 @@ void loadStyle() {
 }
 
 void saveSettings() {
-  String mqttserver = server.arg("mqttserver");
+  String ssid = server.arg("ssid");
+  String pass = server.arg("pass");
   server.send(200, "text/plain", "true");
-}
-
-void initResetJumper() {
-  JUMPER_RESET = digitalRead(AP_CLIENTE);
-  if (JUMPER_RESET == HIGH) {
-    Serial.println("Sem Jumper de RESET.");
-    delay(5000);
-  }
 }
 
 void BotState() {
@@ -138,23 +167,30 @@ void BotState() {
 
 void initSPIFFS() {
   bool result = SPIFFS.begin();
-  Serial.println("SPIFFS: " + result);
+  Serial.print("SPIFFS... ");
+  if (result == 1) {
+    Serial.println("[OK]");
+  } else {
+    Serial.println("[ERRO]");
+  }
   File configfile = SPIFFS.open("/config.json", "r");
   
   if (!configfile) {
-    Serial.println("Arquivo de configuração inexistente. Criando...");
+    Serial.print("Criando arquivo config... ");
     File configfile = SPIFFS.open("/config.json", "w");
     if (!configfile) {
-      Serial.println("Erro ao criar arquivo de configuração.");
+      Serial.println("[ERRO]");
+    } else {
+      Serial.println("[OK]");
     }
-    configfile.println("{mqttserver: test.mosquitto.org, mqttport: 1883, mqttid: 67482172314, mqttuser: NULL, mqttpass: NULL}");
+    configfile.print("{mqttserver: NULL, mqttport: NULL, mqttid: NULL, mqttuser: NULL, mqttpass: NULL, ssid: NULL, pass: NULL}");
   } else {
     while(configfile.available()) {
-      String line = configfile.readStringUntil('n');
-      Serial.println(line);
+      Teste += configfile.readStringUntil('n');
     }
   }
   configfile.close();
+  Serial.println(Teste);
 }
 
 void initPins() {
@@ -169,26 +205,28 @@ void initSerial() {
 }
 
 void initWiFi() {
-
-  /*boolean result = WiFi.softAP("HomeAutomation", "00000000");
-  if(result == true){
-    Serial.println("Configurando AP: Ok");
+  Serial.print("Configurando AP... ");
+  boolean result = WiFi.softAP("AutoConnect", "00000000");
+  if(result == true) {
+    Serial.println("[OK]");
+  } else {
+    Serial.println("[ERRO]");
   }
-  else{
-    Serial.println("Configurando AP: Erro!");
-  }*/
+}
+
+
+void WIFI() {
   
   delay(10);
   
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   
-  Serial.print("Conectando na rede: ");
+  Serial.print("Conectando na rede ");
   Serial.println(WIFI_SSID);
   
   while (WiFi.status() != WL_CONNECTED) {
    Serial.print(".");
    delay(1000);
-   
   }
   
   Serial.println();
