@@ -22,8 +22,8 @@ Consiste em um acionador inteligente de duas cargas com conexão via wireless.
 Consiste em uma central capaz de centralizar informações, conexões e compatibilidade.
 
 - [ ] Sistema;
--- [ ] SSH;
--- [ ] MQTT Broker;
--- [ ] Configuração Hassio;
--- [ ] Nuvem privada;
+  - [ ] SSH;
+  - [ ] MQTT Broker;
+  - [ ] Configuração Hassio;
+  - [ ] Nuvem privada;
 - [ ] Manual;
